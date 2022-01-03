@@ -78,9 +78,7 @@ test('create a connection', async (t) => {
 	t.is(res?.status?.SuccessValue, '');
 });
 
-
 test('create another connection', async (t) => {
-
 	const carolId = 'car.' + contractId
 
 	await recordStart(contractId);
@@ -101,6 +99,26 @@ test('create another connection', async (t) => {
 	t.is(res?.status?.SuccessValue, '');
 });
 
+test('create another connection 2', async (t) => {
+	const carolId = 'car1234567812345678.' + contractId
+
+	await recordStart(contractId);
+
+	const res = await alice.functionCall({
+		contractId,
+		methodName: 'create_connection',
+		args: {
+			event_name,
+			new_connection_id: carolId,
+		},
+		gas,
+		attachedDeposit,
+	});
+	
+	await recordStop(contractId);
+
+	t.is(res?.status?.SuccessValue, '');
+});
 
 test('get connections', async (t) => {
 	const res = await alice.viewFunction(
