@@ -6,7 +6,7 @@ use near_sdk::{
 	// log,
 	env, near_bindgen, Balance, AccountId, BorshStorageKey, PanicOnDefault, Promise,
 	borsh::{self, BorshDeserialize, BorshSerialize},
-	collections::{LookupSet, LookupMap, UnorderedMap, UnorderedSet},
+	collections::{LookupMap, UnorderedMap, UnorderedSet},
 	json_types::{U128},
 };
 
@@ -17,6 +17,7 @@ enum StorageKey {
 	AccountToId,
 	IdToAccount,
 	EventsByName,
+    Attendees { event_name: String },
     NetworksByOwner { event_name: String },
     Connections { event_name_and_owner_id: String },
 }
@@ -28,6 +29,7 @@ pub struct Network {
 
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Event {
+	attendees: UnorderedSet<u64>,
 	networks_by_owner: LookupMap<AccountId, Network>,
 }
 
@@ -35,7 +37,7 @@ pub struct Event {
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Contract {
 	owner_id: AccountId,
-	accounts: LookupSet<AccountId>,
+	account_to_id: LookupMap<AccountId, u64>,
 	id_to_account: LookupMap<u64, AccountId>,
 	last_account_id: u64,
 	events_by_name: UnorderedMap<String, Event>,
@@ -47,7 +49,7 @@ impl Contract {
     pub fn new(owner_id: AccountId) -> Self {
         Self {
 			owner_id,
-			accounts: LookupSet::new(StorageKey::AccountToId),
+			account_to_id: LookupMap::new(StorageKey::AccountToId),
 			id_to_account: LookupMap::new(StorageKey::IdToAccount),
 			last_account_id: 0,
 			events_by_name: UnorderedMap::new(StorageKey::EventsByName),
@@ -61,6 +63,7 @@ impl Contract {
 		assert_eq!(env::predecessor_account_id(), self.owner_id, "owner only");
 		
         assert!(self.events_by_name.insert(&event_name.clone(), &Event{
+			attendees: UnorderedSet::new(StorageKey::Attendees { event_name: event_name.clone() }),
 			networks_by_owner: LookupMap::new(StorageKey::NetworksByOwner { event_name }),
 		}).is_none(), "event exists");
 
@@ -81,14 +84,17 @@ impl Contract {
 		}
 		let mut unwrapped_network = network.unwrap();
 
-		self.last_account_id += 1;
-		if !self.accounts.contains(&new_connection_id) {
-			self.accounts.insert(&new_connection_id);
+		let account_id = self.account_to_id.get(&new_connection_id).unwrap_or({
+			self.last_account_id += 1;
+			self.account_to_id.insert(&new_connection_id, &self.last_account_id);
 			self.id_to_account.insert(&self.last_account_id, &new_connection_id);
-		}
+			self.last_account_id
+		});
 
-		unwrapped_network.connections.insert(&self.last_account_id);
+		unwrapped_network.connections.insert(&account_id);
+		event.attendees.insert(&account_id);
 		event.networks_by_owner.insert(&network_owner_id, &unwrapped_network);
+		self.events_by_name.insert(&event_name, &event);
 
         refund_deposit(env::storage_usage() - initial_storage_usage);
     }
@@ -97,6 +103,14 @@ impl Contract {
 	
     pub fn get_events(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<String> {
 		unordered_map_key_pagination(&self.events_by_name, from_index, limit)
+    }
+
+    pub fn get_attendees(&self, event_name: String, from_index: Option<U128>, limit: Option<u64>) -> Vec<AccountId> {
+		let event = self.events_by_name.get(&event_name).expect("no event");
+		unordered_set_pagination(&event.attendees, from_index, limit)
+			.iter()
+			.map(|id| self.id_to_account.get(id).unwrap())
+			.collect()
     }
 	
     pub fn get_connections(&self, event_name: String, network_owner_id: AccountId, from_index: Option<U128>, limit: Option<u64>) -> Vec<AccountId> {

@@ -120,7 +120,21 @@ test('create another connection 2', async (t) => {
 	t.is(res?.status?.SuccessValue, '');
 });
 
-test('get connections', async (t) => {
+test('get_attendees', async (t) => {
+	const res = await alice.viewFunction(
+		contractId,
+		'get_attendees',
+		{
+			event_name,
+		}
+	);
+
+	console.log(res)
+
+	t.true(res.length >= 1);
+});
+
+test('get_connections', async (t) => {
 	const res = await alice.viewFunction(
 		contractId,
 		'get_connections',
@@ -130,7 +144,7 @@ test('get connections', async (t) => {
 		}
 	);
 
-	// console.log(res)
+	console.log(res)
 
 	t.true(res.length >= 1);
 });
