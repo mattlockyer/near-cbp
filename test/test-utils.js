@@ -82,10 +82,11 @@ const recordStop = async (accountId) => {
 		state: await getAccountState(accountId),
 	};
 
-	console.log('\nAnalysis:\n');
-	console.log('State stake:', stateCost(before.balance, after.balance));
-	console.log('Bytes used:', bytesUsed(before.state, after.state));
-	console.log('\n');
+	console.log(
+		'\n', 'Analysis:', '\n',
+		'State stake:', stateCost(before.balance, after.balance), '\n',
+		'Bytes used:', bytesUsed(before.state, after.state), '\n',
+	);
 };
 
 module.exports = {
